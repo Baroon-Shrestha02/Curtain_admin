@@ -22,7 +22,7 @@ const IMG_BG = {
   blinds: "bg-amber-950",
 };
 
-export default function NewProductCard({ product, onEdit, onDelete }) {
+export default function ProductCard({ product, onEdit, onDelete }) {
   const [imgError, setImgError] = useState(false);
 
   const image = product.images?.[0]?.url;

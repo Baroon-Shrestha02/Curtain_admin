@@ -7,7 +7,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "../../Services/ProductsApi";
-import NewProductCard from "./Productcard";
+import ProductCard from "./Productcard";
 
 const FILTERS = ["All", "Curtains", "Blinds"];
 
@@ -163,7 +163,7 @@ export default function ProductsPage() {
         ) : visible.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((p) => (
-              <NewProductCard
+              <ProductCard
                 key={p.slug || p._id}
                 product={p}
                 onEdit={() => openEdit(p)}
