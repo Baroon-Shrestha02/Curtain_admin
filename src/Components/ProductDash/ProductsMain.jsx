@@ -7,7 +7,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "../../Services/ProductsApi";
-import ProductCard from "./Productcard";
+import ProductCard from "./ProductCard";
 
 const FILTERS = ["All", "Curtains", "Blinds"];
 
