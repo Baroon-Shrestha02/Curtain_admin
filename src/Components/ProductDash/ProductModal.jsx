@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Loader2, UploadCloud, Plus, Trash2, Check } from "lucide-react";
-import { getSubcategoriesByCategory } from "../../Services/ProductsApi";
+import {
+  getCategories,
+  getSubcategoriesBySlug,
+} from "../../Services/ProductsApi";
 
 const EMPTY = {
   name: "",
-  category: "curtains",
+  category: "",
   subcategory: "",
-  originalPrice: "",
+  pricePerSqFt: "",
   discount: "",
+  minOrderQty: "",
   description: "",
   badge: "",
-  sale: false,
-  inStock: true,
   images: [],
   specs: [{ label: "", value: "" }],
   features: [""],
@@ -30,70 +32,113 @@ export default function ProductModal({
   const [err, setErr] = useState(null);
   const [previews, setPreviews] = useState([]);
 
+  // Category combobox state
+  const [allCats, setAllCats] = useState([]); // [{name, slug}]
+  const [catLoading, setCatLoading] = useState(false);
+  const [catQuery, setCatQuery] = useState("");
+  const [catOpen, setCatOpen] = useState(false);
+  const catBoxRef = useRef(null);
+
   // Subcategory combobox state
-  const [allSubs, setAllSubs] = useState([]);
+  const [allSubs, setAllSubs] = useState([]); // string[]
   const [subLoading, setSubLoading] = useState(false);
-  const [subQuery, setSubQuery] = useState(""); // what's typed in the box
-  const [subOpen, setSubOpen] = useState(false); // dropdown visibility
+  const [subQuery, setSubQuery] = useState("");
+  const [subOpen, setSubOpen] = useState(false);
   const subBoxRef = useRef(null);
 
   const inputRef = useRef(null);
 
+  // Hydrate form on open / mode change.
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && initialData) {
       setForm({
         name: initialData.name || "",
-        category: (initialData.category || "curtains").toLowerCase(),
+        category: (initialData.category || "").toLowerCase(),
         subcategory: initialData.subcategory || "",
-        originalPrice: initialData.originalPrice ?? "",
+        pricePerSqFt: initialData.pricePerSqFt ?? "",
         discount: initialData.discount ?? "",
+        minOrderQty: initialData.minOrderQty ?? "",
         description: initialData.description || "",
         badge: initialData.badge || "",
-        sale: initialData.sale ?? false,
-        inStock: initialData.inStock ?? true,
         images: [],
         specs: initialData.specs || [],
         features: initialData.features || [],
         colors: initialData.colors || [],
       });
       setPreviews((initialData.images || []).map((im) => im.url || im));
+      setCatQuery((initialData.category || "").toLowerCase());
       setSubQuery(initialData.subcategory || "");
     } else {
       setForm(EMPTY);
       setPreviews([]);
+      setCatQuery("");
       setSubQuery("");
     }
     setErr(null);
     setSaving(false);
+    setCatOpen(false);
     setSubOpen(false);
   }, [open, mode, initialData]);
 
-  // Fetch ALL subcategories once when the modal opens.
+  // Fetch categories when modal opens.
   useEffect(() => {
     if (!open) return;
     let active = true;
-    setSubLoading(true);
-    getSubcategoriesByCategory()
-      .then((list) => active && setAllSubs(Array.isArray(list) ? list : []))
-      .catch(() => active && setAllSubs([]))
-      .finally(() => active && setSubLoading(false));
+    setCatLoading(true);
+    getCategories()
+      .then((list) => active && setAllCats(Array.isArray(list) ? list : []))
+      .catch(() => active && setAllCats([]))
+      .finally(() => active && setCatLoading(false));
     return () => {
       active = false;
     };
   }, [open]);
 
-  // Close dropdown on outside click.
+  // Fetch subcategories for the selected category.
   useEffect(() => {
-    if (!subOpen) return;
+    if (!open) return;
+    const catName = form.category.trim().toLowerCase();
+    if (!catName) {
+      setAllSubs([]);
+      return;
+    }
+    const catDoc = allCats.find((c) => c.name.toLowerCase() === catName);
+    if (!catDoc) {
+      setAllSubs([]);
+      return;
+    }
+    let active = true;
+    setSubLoading(true);
+    getSubcategoriesBySlug(catDoc.slug)
+      .then(
+        (list) =>
+          active &&
+          setAllSubs(
+            Array.isArray(list) ? list.map((s) => s.name || s).filter(Boolean) : [],
+          ),
+      )
+      .catch(() => active && setAllSubs([]))
+      .finally(() => active && setSubLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [open, form.category, allCats]);
+
+  // Close dropdowns on outside click.
+  useEffect(() => {
+    if (!catOpen && !subOpen) return;
     const onClick = (e) => {
+      if (catBoxRef.current && !catBoxRef.current.contains(e.target)) {
+        setCatOpen(false);
+      }
       if (subBoxRef.current && !subBoxRef.current.contains(e.target)) {
         setSubOpen(false);
       }
     };
     window.addEventListener("mousedown", onClick);
     return () => window.removeEventListener("mousedown", onClick);
-  }, [subOpen]);
+  }, [catOpen, subOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,11 +147,37 @@ export default function ProductModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const catNames = useMemo(() => allCats.map((c) => c.name), [allCats]);
+
   if (!open) return null;
 
   const change = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({ ...f, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  // ── Category combobox helpers ──
+  const cq = catQuery.trim().toLowerCase();
+  const filteredCats = cq
+    ? catNames.filter((s) => s.toLowerCase().includes(cq))
+    : catNames;
+  const catExact = catNames.some((s) => s.toLowerCase() === cq);
+  const canAddNewCat = cq.length > 0 && !catExact;
+
+  const pickCat = (val) => {
+    const v = val.trim();
+    setForm((f) => ({ ...f, category: v, subcategory: "" }));
+    setCatQuery(v);
+    setSubQuery("");
+    setCatOpen(false);
+  };
+
+  const onCatInput = (e) => {
+    const val = e.target.value;
+    setCatQuery(val);
+    setForm((f) => ({ ...f, category: val, subcategory: "" }));
+    setSubQuery("");
+    setCatOpen(true);
   };
 
   // ── Subcategory combobox helpers ──
@@ -126,7 +197,7 @@ export default function ProductModal({
   const onSubInput = (e) => {
     const val = e.target.value;
     setSubQuery(val);
-    setForm((f) => ({ ...f, subcategory: val })); // typed value IS the value
+    setForm((f) => ({ ...f, subcategory: val }));
     setSubOpen(true);
   };
 
@@ -179,7 +250,11 @@ export default function ProductModal({
     setSaving(true);
     setErr(null);
     try {
-      await onSave?.({ ...form, subcategory: form.subcategory.trim() });
+      await onSave?.({
+        ...form,
+        category: form.category.trim(),
+        subcategory: form.subcategory.trim(),
+      });
       onClose?.();
     } catch (e2) {
       setErr(e2.response?.data?.message || "Save failed. Please try again.");
@@ -237,19 +312,58 @@ export default function ProductModal({
 
           {/* Category + Subcategory */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+            {/* Category searchable combobox */}
+            <div ref={catBoxRef} className="relative">
+              <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
                 Category
+                {catLoading && (
+                  <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                )}
               </label>
-              <select
+              <input
                 name="category"
-                value={form.category}
-                onChange={change}
+                value={catQuery}
+                onChange={onCatInput}
+                onFocus={() => setCatOpen(true)}
+                placeholder="Search or type new…"
+                required
+                autoComplete="off"
                 className={field}
-              >
-                <option value="curtains">Curtains</option>
-                <option value="blinds">Blinds</option>
-              </select>
+              />
+
+              {catOpen && (filteredCats.length > 0 || canAddNewCat) && (
+                <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  {filteredCats.map((s) => {
+                    const selected = s.toLowerCase() === form.category.toLowerCase();
+                    return (
+                      <li key={s}>
+                        <button
+                          type="button"
+                          onClick={() => pickCat(s)}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          {s}
+                          {selected && (
+                            <Check className="h-4 w-4 text-red-600" />
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+
+                  {canAddNewCat && (
+                    <li className="border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => pickCat(catQuery.trim())}
+                        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <Plus className="h-4 w-4" /> Add “{catQuery.trim()}”
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
             </div>
 
             {/* Subcategory searchable combobox */}
@@ -265,9 +379,14 @@ export default function ProductModal({
                 value={subQuery}
                 onChange={onSubInput}
                 onFocus={() => setSubOpen(true)}
-                placeholder="Search or type new…"
+                placeholder={
+                  form.category
+                    ? "Search or type new…"
+                    : "Pick a category first"
+                }
                 required
                 autoComplete="off"
+                disabled={!form.category.trim()}
                 className={field}
               />
 
@@ -307,19 +426,20 @@ export default function ProductModal({
             </div>
           </div>
 
-          {/* Price + Discount */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Price + Discount + MinOrderQty */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Original Price (Rs.)
+                Price / sq ft (Rs.)
               </label>
               <input
-                name="originalPrice"
+                name="pricePerSqFt"
                 type="number"
                 min="0"
-                value={form.originalPrice}
+                step="0.01"
+                value={form.pricePerSqFt}
                 onChange={change}
-                placeholder="4500"
+                placeholder="450"
                 required
                 className={field}
               />
@@ -339,18 +459,33 @@ export default function ProductModal({
                 className={field}
               />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Min Order (sq ft)
+              </label>
+              <input
+                name="minOrderQty"
+                type="number"
+                min="1"
+                value={form.minOrderQty}
+                onChange={change}
+                placeholder="1"
+                className={field}
+              />
+            </div>
           </div>
 
           {/* Calculated price preview */}
-          {form.originalPrice && (
+          {form.pricePerSqFt && (
             <p className="text-xs text-gray-500">
               Final price:{" "}
               <span className="font-semibold text-gray-800">
                 Rs.{" "}
                 {(
-                  form.originalPrice -
-                  (form.originalPrice * (form.discount || 0)) / 100
-                ).toFixed(0)}
+                  form.pricePerSqFt -
+                  (form.pricePerSqFt * (form.discount || 0)) / 100
+                ).toFixed(2)}{" "}
+                / sq ft
               </span>
             </p>
           )}
@@ -371,47 +506,23 @@ export default function ProductModal({
             />
           </div>
 
-          {/* Badge + sale + inStock */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Badge
-              </label>
-              <select
-                name="badge"
-                value={form.badge}
-                onChange={change}
-                className={field}
-              >
-                <option value="">None</option>
-                <option value="New">New</option>
-                <option value="Bestseller">Bestseller</option>
-                <option value="Sale">Sale</option>
-                <option value="Limited">Limited</option>
-              </select>
-            </div>
-            <div className="flex flex-col justify-end gap-2 pb-1">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="sale"
-                  checked={form.sale}
-                  onChange={change}
-                  className="h-4 w-4 rounded accent-red-600"
-                />
-                On Sale
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="inStock"
-                  checked={form.inStock}
-                  onChange={change}
-                  className="h-4 w-4 rounded accent-red-600"
-                />
-                In Stock
-              </label>
-            </div>
+          {/* Badge */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Badge
+            </label>
+            <select
+              name="badge"
+              value={form.badge}
+              onChange={change}
+              className={field}
+            >
+              <option value="">None</option>
+              <option value="New">New</option>
+              <option value="Bestseller">Bestseller</option>
+              <option value="Sale">Sale</option>
+              <option value="Limited">Limited</option>
+            </select>
           </div>
 
           {/* Images */}

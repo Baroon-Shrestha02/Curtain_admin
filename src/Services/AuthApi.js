@@ -21,10 +21,14 @@ export const logout = async () => {
   }
 };
 
-// POST /auth/change-password
-export const changePassword = async ({ email, password, confirmPassword }) => {
-  const { data } = await api.post("/auth/change-password", {
-    email,
+// PATCH /auth/change-password
+export const changePassword = async ({
+  currentPassword,
+  password,
+  confirmPassword,
+}) => {
+  const { data } = await api.patch("/auth/change-password", {
+    currentPassword,
     password,
     confirmPassword,
   });

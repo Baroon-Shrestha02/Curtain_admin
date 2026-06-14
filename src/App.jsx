@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./Pages/Home";
 import Products from "./Pages/Products";
 import Gallery from "./Pages/Gallery";
+import Profile from "./Pages/Profile";
 import Wrapper from "./Components/Layout/Wrapper";
 import Login from "./Components/Auth/Login";
 import ProtectedRoute from "./Components/Auth/ProtectedRoute";
@@ -23,6 +24,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
         <Route path="/gallery" element={<Gallery />} />
+        <Route path="/profile" element={<Profile />} />
       </Route>
 
       {/* Unknown routes -> login */}

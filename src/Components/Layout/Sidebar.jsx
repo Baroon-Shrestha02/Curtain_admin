@@ -1,17 +1,39 @@
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Package, Image, LogOut, PanelLeft, User } from "lucide-react";
+import {
+  Home,
+  Package,
+  Image,
+  LogOut,
+  PanelLeft,
+  User,
+  UserCircle,
+} from "lucide-react";
+import { useAuth } from "../../Utils/AuthContext";
 
 const NAV_ITEMS = [
   { label: "Home", icon: Home, to: "/" },
   { label: "Products", icon: Package, to: "/products" },
   { label: "Gallery", icon: Image, to: "/gallery" },
+  { label: "Profile", icon: UserCircle, to: "/profile" },
 ];
+
+const fullName = (u) =>
+  [u?.firstname, u?.lastname].filter(Boolean).join(" ").trim() || "Account";
 
 export default function Sidebar({ onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  // Log current user to the console for visibility.
+  useEffect(() => {
+    if (user) {
+      // eslint-disable-next-line no-console
+      console.log("Logged user:", user);
+    }
+  }, [user]);
 
   // Decide initial + responsive state based on viewport width.
   useEffect(() => {
@@ -19,7 +41,6 @@ export default function Sidebar({ onLogout }) {
 
     const apply = (matches) => {
       setIsMobile(matches);
-      // Open on large screens, collapsed on small screens by default.
       setCollapsed(matches);
     };
 
@@ -32,14 +53,21 @@ export default function Sidebar({ onLogout }) {
 
   const expanded = !collapsed;
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      localStorage.removeItem("token");
+    }
     if (typeof onLogout === "function") {
       onLogout();
     } else {
       navigate("/login");
     }
   };
+
+  const displayName = fullName(user);
+  const displayEmail = user?.email || "";
 
   return (
     <>
@@ -88,7 +116,6 @@ export default function Sidebar({ onLogout }) {
             <NavLink
               key={to}
               to={to}
-              // `end` ensures the "/" Home link isn't active on every route.
               end={to === "/"}
               onClick={() => {
                 if (isMobile) setCollapsed(true);
@@ -127,11 +154,16 @@ export default function Sidebar({ onLogout }) {
         </div>
 
         {/* User footer */}
-        <div
+        <NavLink
+          to="/profile"
+          onClick={() => {
+            if (isMobile) setCollapsed(true);
+          }}
           className={[
-            "flex items-center gap-2.5 border-t border-neutral-200 p-3",
+            "flex items-center gap-2.5 border-t border-neutral-200 p-3 hover:bg-neutral-50",
             expanded ? "justify-between" : "justify-center",
           ].join(" ")}
+          title={!expanded ? displayName : undefined}
         >
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
@@ -140,15 +172,17 @@ export default function Sidebar({ onLogout }) {
             {expanded && (
               <div className="overflow-hidden leading-tight">
                 <div className="whitespace-nowrap text-[13px] font-semibold text-neutral-900">
-                  John Doe
+                  {displayName}
                 </div>
-                <div className="truncate text-xs text-neutral-500">
-                  john@example.com
-                </div>
+                {displayEmail && (
+                  <div className="truncate text-xs text-neutral-500 max-w-[160px]">
+                    {displayEmail}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        </div>
+        </NavLink>
       </aside>
 
       {/* Floating open button for mobile when collapsed off-screen */}

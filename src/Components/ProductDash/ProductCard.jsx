@@ -22,19 +22,25 @@ const IMG_BG = {
   blinds: "bg-amber-950",
 };
 
+const formatPrice = (n) =>
+  Number(n ?? 0).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
 export default function ProductCard({ product, onEdit, onDelete }) {
   const [imgError, setImgError] = useState(false);
 
   const image = product.images?.[0]?.url;
   const showImage = image && !imgError;
-  const isCurtain = product.category === "curtains";
+  const fallbackBg = IMG_BG[product.category] || "bg-gray-700";
   const discounted = product.discount > 0;
 
   return (
     <div className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
       {/* Image */}
       <div
-        className={`relative aspect-[4/3] overflow-hidden ${!showImage ? (isCurtain ? "bg-gray-900" : "bg-amber-950") : "bg-gray-100"}`}
+        className={`relative aspect-[4/3] overflow-hidden ${!showImage ? fallbackBg : "bg-gray-100"}`}
       >
         {showImage ? (
           <img
@@ -55,21 +61,12 @@ export default function ProductCard({ product, onEdit, onDelete }) {
         </span>
 
         {/* Badge — top right */}
-        {product.badge && (
+        {product.badge && product.badge !== "None" && (
           <span
             className={`absolute right-3 top-3 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${BADGE_STYLES[product.badge] || "bg-gray-700 text-white"}`}
           >
             {product.badge}
           </span>
-        )}
-
-        {/* Out of stock */}
-        {!product.inStock && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
-            <span className="rounded-full border border-white/30 bg-white/90 px-4 py-1.5 text-xs font-bold text-gray-800">
-              Out of Stock
-            </span>
-          </div>
         )}
 
         {/* Hover actions */}
@@ -103,15 +100,16 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           </p>
         </div>
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2">
+        {/* Price per sq ft */}
+        <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-xl font-black text-gray-900">
-            Rs. {product.price?.toLocaleString()}
+            Rs. {formatPrice(product.discountedPricePerSqFt)}
           </span>
+          <span className="text-xs text-gray-500">/ sq ft</span>
           {discounted && (
             <>
               <span className="text-sm text-gray-400 line-through">
-                Rs. {product.originalPrice?.toLocaleString()}
+                Rs. {formatPrice(product.pricePerSqFt)}
               </span>
               <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600">
                 -{product.discount}%
@@ -119,6 +117,13 @@ export default function ProductCard({ product, onEdit, onDelete }) {
             </>
           )}
         </div>
+
+        {/* Min order */}
+        {product.minOrderQty > 1 && (
+          <p className="text-[11px] text-gray-400">
+            Min order: {product.minOrderQty} sq ft
+          </p>
+        )}
 
         {/* Colors */}
         {product.colors?.length > 0 && (

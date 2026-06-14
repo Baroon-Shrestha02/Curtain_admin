@@ -6,10 +6,11 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  getCategories,
 } from "../../Services/ProductsApi";
 import ProductCard from "./ProductCard";
 
-const FILTERS = ["All", "Curtains", "Blinds"];
+const ALL = "All";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -17,13 +18,13 @@ export default function ProductsPage() {
   const [error, setError] = useState(null);
 
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState(ALL);
+  const [categories, setCategories] = useState([]); // [{name, slug}]
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("add");
   const [editing, setEditing] = useState(null);
 
-  // Fetch products on mount.
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -37,14 +38,37 @@ export default function ProductsPage() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const list = await getCategories();
+      setCategories(Array.isArray(list) ? list : []);
+    } catch {
+      setCategories([]);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadCategories();
   }, []);
+
+  const filterOptions = useMemo(
+    () => [ALL, ...categories.map((c) => c.name)],
+    [categories],
+  );
+
+  // Reset filter if the active one disappears (e.g. last product of a category deleted).
+  useEffect(() => {
+    if (filter !== ALL && !filterOptions.includes(filter)) {
+      setFilter(ALL);
+    }
+  }, [filterOptions, filter]);
 
   const visible = useMemo(() => {
     return products.filter((p) => {
       const cat = (p.category || "").toLowerCase();
-      const matchesFilter = filter === "All" || cat === filter.toLowerCase();
+      const matchesFilter =
+        filter === ALL || cat === filter.toLowerCase();
       const matchesQuery = (p.name || "")
         .toLowerCase()
         .includes(query.toLowerCase());
@@ -74,6 +98,7 @@ export default function ProductsPage() {
       const created = await createProduct(form);
       setProducts((list) => [created, ...list]);
     }
+    loadCategories();
   };
 
   const handleDelete = async (product) => {
@@ -81,10 +106,14 @@ export default function ProductsPage() {
     try {
       await deleteProduct(product.slug);
       setProducts((list) => list.filter((p) => p.slug !== product.slug));
+      loadCategories();
     } catch (err) {
       alert(err.response?.data?.message || "Delete failed.");
     }
   };
+
+  const capitalize = (s) =>
+    s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -126,8 +155,8 @@ export default function ProductsPage() {
             />
           </div>
 
-          <div className="flex gap-2">
-            {FILTERS.map((f) => (
+          <div className="flex gap-2 flex-wrap">
+            {filterOptions.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -138,7 +167,7 @@ export default function ProductsPage() {
                     : "bg-white text-gray-600 hover:bg-gray-100",
                 ].join(" ")}
               >
-                {f}
+                {f === ALL ? f : capitalize(f)}
               </button>
             ))}
           </div>

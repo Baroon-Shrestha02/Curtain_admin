@@ -14,16 +14,16 @@ export const getProduct = async (slug) => {
 
 /**
  * Build a multipart FormData body from a plain form object.
- * - originalPrice / discount sent as-is (server Number()-parses them)
- * - specs / features stringified (server JSON.parse()s them)
- * - images: array of File objects -> appended under "images"
+ * Numeric fields sent as-is (server Number()-parses them).
+ * specs / features / colors stringified (server JSON.parse()s them).
+ * images: array of File objects -> appended under "images".
  */
 function toFormData(form) {
   const fd = new FormData();
   const { images, colors, specs, features, ...rest } = form;
 
   Object.entries(rest).forEach(([key, val]) => {
-    if (val !== undefined && val !== null) fd.append(key, val);
+    if (val !== undefined && val !== null && val !== "") fd.append(key, val);
   });
 
   if (Array.isArray(specs)) fd.append("specs", JSON.stringify(specs));
@@ -58,7 +58,14 @@ export const deleteProduct = async (slug) => {
   return data;
 };
 
-export const getSubcategoriesByCategory = async () => {
-  const { data } = await api.get(`/products/subcategory`);
-  return data.data; // ["Roller", "Roman", ...]
+// GET /categories
+export const getCategories = async () => {
+  const { data } = await api.get("/categories");
+  return data.data; // [{_id, name, slug, ...}]
+};
+
+// GET /categories/:slug/subcategories
+export const getSubcategoriesBySlug = async (slug) => {
+  const { data } = await api.get(`/categories/${slug}/subcategories`);
+  return data.data; // [{_id, name, slug, parent}]
 };

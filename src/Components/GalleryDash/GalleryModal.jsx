@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useRef, useState } from "react";
 import {
   X,
@@ -10,7 +11,7 @@ import {
 import { getGalleryCategories } from "../../Services/GalleryApi";
 
 /**
- * Upload-image modal (file picker + preview).
+ * Upload-media modal (file picker + preview).
  *
  * Props:
  *  - open: boolean
@@ -19,7 +20,7 @@ import { getGalleryCategories } from "../../Services/GalleryApi";
  */
 
 export default function GalleryModal({ open, onClose, onUpload }) {
-  const [files, setFiles] = useState([]); // [{ file, previewUrl }]
+  const [files, setFiles] = useState([]); // [{ file, previewUrl, isVideo }]
   const [category, setCategory] = useState(""); // selected/typed value
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -106,10 +107,14 @@ export default function GalleryModal({ open, onClose, onUpload }) {
   };
 
   const addFiles = (fileList) => {
-    const imgs = Array.from(fileList)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((file) => ({ file, previewUrl: URL.createObjectURL(file) }));
-    setFiles((prev) => [...prev, ...imgs]);
+    const media = Array.from(fileList)
+      .filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"))
+      .map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        isVideo: file.type.startsWith("video/"),
+      }));
+    setFiles((prev) => [...prev, ...media]);
   };
 
   const removeAt = (idx) =>
@@ -147,7 +152,7 @@ export default function GalleryModal({ open, onClose, onUpload }) {
 
       <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-lg font-bold text-gray-900">Upload Images</h2>
+          <h2 className="text-lg font-bold text-gray-900">Upload Media</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
@@ -229,13 +234,15 @@ export default function GalleryModal({ open, onClose, onUpload }) {
           >
             <UploadCloud className="h-8 w-8 text-gray-400" />
             <p className="mt-2 text-sm font-medium text-gray-700">
-              Click to browse or drag images here
+              Click to browse or drag files here
             </p>
-            <p className="text-xs text-gray-400">PNG, JPG, WEBP</p>
+            <p className="text-xs text-gray-400">
+              PNG, JPG, WEBP, MP4, WEBM (max 10MB image / 20MB video)
+            </p>
             <input
               ref={inputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               hidden
               onChange={(e) => {
@@ -253,11 +260,26 @@ export default function GalleryModal({ open, onClose, onUpload }) {
                   key={i}
                   className="relative aspect-square overflow-hidden rounded-lg bg-gray-100"
                 >
-                  <img
-                    src={f.previewUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  {f.isVideo ? (
+                    <video
+                      src={f.previewUrl}
+                      muted
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={f.previewUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+
+                  {f.isVideo && (
+                    <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                      Video
+                    </span>
+                  )}
+
                   <button
                     onClick={() => removeAt(i)}
                     className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white transition-colors hover:bg-black/80"
