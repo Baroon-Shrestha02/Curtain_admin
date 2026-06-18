@@ -8,6 +8,7 @@ import {
   PanelLeft,
   User,
   UserCircle,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "../../Utils/AuthContext";
 
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { label: "Home", icon: Home, to: "/" },
   { label: "Products", icon: Package, to: "/products" },
   { label: "Gallery", icon: Image, to: "/gallery" },
+  { label: "Settings", icon: SettingsIcon, to: "/settings" },
   { label: "Profile", icon: UserCircle, to: "/profile" },
 ];
 
